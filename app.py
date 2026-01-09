@@ -43,6 +43,9 @@ TRANSLATIONS = {
         "add_script": "📝 新增腳本",
         "my_scripts": "📚 我的腳本庫",
         "search_scripts": "🔍 搜尋腳本",
+        "trending": "🔥 熱門",
+        "favorites": "⭐ 收藏",
+        "recent": "🕐 最近",
         "title_label": "標題 *",
         "title_placeholder": "輸入腳本標題",
         "tags_label": "標籤（用逗號分隔）",
@@ -55,6 +58,11 @@ TRANSLATIONS = {
         "delete_btn": "🗑️ 刪除",
         "download_btn": "📥 下載",
         "copy_btn": "📋 複製",
+        "like_btn": "👍 讚",
+        "unlike_btn": "👎 取消讚",
+        "share_btn": "🔗 分享",
+        "export_btn": "📤 匯出",
+        "import_btn": "📥 匯入",
         "search_placeholder": "🔎 搜尋標題或標籤...",
         "language": "語言",
         "error_supabase": "❌ Supabase 連線失敗：",
@@ -83,6 +91,20 @@ TRANSLATIONS = {
         "error_title_empty": "❌ 標題不能空白！",
         "error_code_empty": "❌ 腳本內容不能空白！",
         "start_lua": "-- 開始寫你的 Lua 腳本\nprint('Hello from Void!')",
+        "copied_to_clipboard": "📋 已複製到剪貼板！",
+        "by": "作者",
+        "views": "瀏覽數",
+        "likes": "讚數",
+        "created": "建立於",
+        "updated": "更新於",
+        "rating": "⭐ 評分",
+        "rate_script": "評分此腳本 (1-5 星)",
+        "author": "作者",
+        "share_link": "分享連結",
+        "link_copied": "✅ 連結已複製到剪貼板！",
+        "no_favorites": "🎯 還沒有收藏的腳本！",
+        "add_favorite": "❤️ 加入收藏",
+        "remove_favorite": "💔 移除收藏",
     },
     "en": {
         "title": "Lua Script Hub",
@@ -103,6 +125,9 @@ TRANSLATIONS = {
         "add_script": "📝 Add Script",
         "my_scripts": "📚 My Scripts",
         "search_scripts": "🔍 Search Scripts",
+        "trending": "🔥 Trending",
+        "favorites": "⭐ Favorites",
+        "recent": "🕐 Recent",
         "title_label": "Title *",
         "title_placeholder": "Enter script title",
         "tags_label": "Tags (comma separated)",
@@ -115,6 +140,11 @@ TRANSLATIONS = {
         "delete_btn": "🗑️ Delete",
         "download_btn": "📥 Download",
         "copy_btn": "📋 Copy",
+        "like_btn": "👍 Like",
+        "unlike_btn": "👎 Unlike",
+        "share_btn": "🔗 Share",
+        "export_btn": "📤 Export",
+        "import_btn": "📥 Import",
         "search_placeholder": "🔎 Search title or tags...",
         "language": "Language",
         "error_supabase": "❌ Supabase connection failed: ",
@@ -143,6 +173,20 @@ TRANSLATIONS = {
         "error_title_empty": "❌ Title cannot be empty!",
         "error_code_empty": "❌ Script content cannot be empty!",
         "start_lua": "-- Start writing your Lua script\nprint('Hello from Void!')",
+        "copied_to_clipboard": "📋 Copied to clipboard!",
+        "by": "By",
+        "views": "Views",
+        "likes": "Likes",
+        "created": "Created",
+        "updated": "Updated",
+        "rating": "⭐ Rating",
+        "rate_script": "Rate this script (1-5 stars)",
+        "author": "Author",
+        "share_link": "Share Link",
+        "link_copied": "✅ Link copied to clipboard!",
+        "no_favorites": "🎯 No favorite scripts yet!",
+        "add_favorite": "❤️ Add to Favorites",
+        "remove_favorite": "💔 Remove from Favorites",
     }
 }
 
@@ -276,7 +320,7 @@ def main_page():
         st.header(t('menu'))
         page = st.radio(
             t('choose_feature'),
-            [t('add_script'), t('my_scripts'), t('search_scripts')],
+            [t('add_script'), t('my_scripts'), t('search_scripts'), t('trending'), t('favorites'), t('recent')],
             label_visibility="collapsed"
         )
         
@@ -356,7 +400,13 @@ def main_page():
                             "title": title.strip(),
                             "description": desc.strip(),
                             "script_text": st.session_state.lua_code,
-                            "tags": [t.strip() for t in tags.split(",") if t.strip()]
+                            "tags": [t.strip() for t in tags.split(",") if t.strip()],
+                            "author": st.session_state.user.email.split('@')[0],
+                            "likes": 0,
+                            "views": 0,
+                            "is_favorite": False,
+                            "created_at": datetime.now().isoformat(),
+                            "updated_at": datetime.now().isoformat()
                         }
                         supabase.table("user_scripts").insert(data).execute()
                         st.success(t('success_save'))
@@ -386,6 +436,23 @@ def main_page():
             
             for s in scripts:
                 with st.expander(f"🔹 {s.get('title', t('untitled'))} ({s.get('created_at', '')[:10]})"):
+                    # 顯示基本信息
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("👍", s.get('likes', 0))
+                    with col2:
+                        st.metric("📊", s.get('views', 0))
+                    with col3:
+                        is_fav = s.get('is_favorite', False)
+                        st.metric("❤️", "是" if is_fav else "否")
+                    with col4:
+                        if st.button("⭐" if s.get('is_favorite', False) else "☆", key=f"fav_{s['id']}", use_container_width=True):
+                            try:
+                                supabase.table("user_scripts").update({"is_favorite": not s.get('is_favorite', False)}).eq("id", s['id']).execute()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ {str(e)}")
+                    
                     col1, col2, col3 = st.columns([2, 1, 1])
                     
                     with col1:
@@ -411,7 +478,7 @@ def main_page():
                     
                     st.code(s.get('script_text', ''), language="lua")
                     
-                    col1, col2 = st.columns(2)
+                    col1, col2, col3 = st.columns(3)
                     with col1:
                         st.download_button(
                             t('download_btn'),
@@ -423,6 +490,11 @@ def main_page():
                     with col2:
                         if st.button(t('copy_btn'), key=f"copy_{s['id']}", use_container_width=True):
                             st.text_area(t('copy_code'), s.get('script_text', ''), height=100, disabled=True, key=f"textarea_{s['id']}")
+                    with col3:
+                        if st.button(t('share_btn'), key=f"share_{s['id']}", use_container_width=True):
+                            share_url = f"Script: {s.get('title', 'Script')} by {s.get('author', 'Unknown')}\nID: {s['id']}"
+                            st.success(t('link_copied'))
+                            st.code(share_url)
     
     # 搜尋腳本頁面
     elif page == t('search_scripts'):
@@ -449,6 +521,23 @@ def main_page():
             
             for s in filtered:
                 with st.expander(f"🔹 {s.get('title', t('untitled'))}"):
+                    # 顯示統計信息
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("👍", s.get('likes', 0))
+                    with col2:
+                        st.metric("📊", s.get('views', 0))
+                    with col3:
+                        st.caption(f"👤 {s.get('author', 'Unknown')}")
+                    with col4:
+                        if st.button(t('like_btn'), key=f"like_search_{s['id']}", use_container_width=True):
+                            try:
+                                current_likes = s.get('likes', 0)
+                                supabase.table("user_scripts").update({"likes": current_likes + 1}).eq("id", s['id']).execute()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ {str(e)}")
+                    
                     if s.get('description'):
                         st.caption(f"📝 {s['description']}")
                     if s.get('tags'):
@@ -457,15 +546,139 @@ def main_page():
                     
                     st.code(s.get('script_text', ''), language="lua")
                     
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.download_button(
+                            t('download_btn'),
+                            data=s.get('script_text', ''),
+                            file_name=f"{s.get('title', 'script')}.lua",
+                            mime="text/plain",
+                            use_container_width=True,
+                            key=f"search_download_{s['id']}"
+                        )
+                    with col2:
+                        if st.button(t('copy_btn'), key=f"search_copy_{s['id']}", use_container_width=True):
+                            st.text_area(t('copy_code'), s.get('script_text', ''), height=100, disabled=True, key=f"search_textarea_{s['id']}")
+                    with col3:
+                        if st.button(t('share_btn'), key=f"search_share_{s['id']}", use_container_width=True):
+                            share_url = f"Script: {s.get('title', 'Script')} by {s.get('author', 'Unknown')}\nID: {s['id']}"
+                            st.success(t('link_copied'))
+                            st.code(share_url)
+    
+    # 熱門腳本頁面
+    elif page == t('trending'):
+        st.subheader(t('trending'))
+        
+        try:
+            all_scripts = supabase.table("user_scripts").select("*").order("created_at", desc=True).execute().data
+        except Exception as e:
+            st.error(f"{t('error_read_scripts')}{str(e)}")
+            all_scripts = []
+        
+        # 按讚數排序
+        trending_scripts = sorted(all_scripts, key=lambda x: x.get('likes', 0), reverse=True)[:10]
+        
+        if not trending_scripts:
+            st.info(t('no_match'))
+        else:
+            st.write(f"🔥 {t('found_count')}**{len(trending_scripts)}**{t('found_count_suffix')}")
+            for idx, s in enumerate(trending_scripts, 1):
+                with st.expander(f"#{idx} ⭐ {s.get('title', t('untitled'))} ({s.get('likes', 0)} {t('likes')})"):
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.caption(f"👤 {t('by')}: {s.get('author', 'Unknown')}")
+                        if s.get('description'):
+                            st.caption(f"📝 {s['description']}")
+                        if s.get('tags'):
+                            tags_str = " | ".join([f"🏷️ {tag}" for tag in s['tags']])
+                            st.caption(tags_str)
+                    with col2:
+                        st.metric("👍", s.get('likes', 0))
+                    
+                    st.code(s.get('script_text', ''), language="lua")
                     st.download_button(
                         t('download_btn'),
                         data=s.get('script_text', ''),
                         file_name=f"{s.get('title', 'script')}.lua",
                         mime="text/plain",
-                        use_container_width=True
+                        use_container_width=True,
+                        key=f"trending_download_{s['id']}"
                     )
-
-# 主應用邏輯
+    
+    # 收藏頁面
+    elif page == t('favorites'):
+        st.subheader(t('favorites'))
+        
+        try:
+            all_scripts = supabase.table("user_scripts").select("*").order("created_at", desc=True).execute().data
+        except Exception as e:
+            st.error(f"{t('error_read_scripts')}{str(e)}")
+            all_scripts = []
+        
+        # 顯示標記為收藏的腳本
+        favorite_scripts = [s for s in all_scripts if s.get('is_favorite', False)]
+        
+        if not favorite_scripts:
+            st.info(t('no_favorites'))
+        else:
+            st.write(f"⭐ {t('found_count')}**{len(favorite_scripts)}**{t('found_count_suffix')}")
+            for s in favorite_scripts:
+                with st.expander(f"❤️ {s.get('title', t('untitled'))}"):
+                    if s.get('description'):
+                        st.caption(f"📝 {s['description']}")
+                    if s.get('tags'):
+                        tags_str = " | ".join([f"🏷️ {tag}" for tag in s['tags']])
+                        st.caption(tags_str)
+                    
+                    st.code(s.get('script_text', ''), language="lua")
+                    st.download_button(
+                        t('download_btn'),
+                        data=s.get('script_text', ''),
+                        file_name=f"{s.get('title', 'script')}.lua",
+                        mime="text/plain",
+                        use_container_width=True,
+                        key=f"favorites_download_{s['id']}"
+                    )
+    
+    # 最近瀏覽頁面
+    elif page == t('recent'):
+        st.subheader(t('recent'))
+        
+        try:
+            all_scripts = supabase.table("user_scripts").select("*").order("created_at", desc=True).execute().data
+        except Exception as e:
+            st.error(f"{t('error_read_scripts')}{str(e)}")
+            all_scripts = []
+        
+        # 顯示最近的腳本
+        recent_scripts = all_scripts[:10]
+        
+        if not recent_scripts:
+            st.info(t('no_match'))
+        else:
+            st.write(f"🕐 {t('found_count')}**{len(recent_scripts)}**{t('found_count_suffix')}")
+            for s in recent_scripts:
+                with st.expander(f"🕐 {s.get('title', t('untitled'))} ({s.get('created_at', '')[:10]})"):
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.caption(f"👤 {t('by')}: {s.get('author', 'Unknown')}")
+                        if s.get('description'):
+                            st.caption(f"📝 {s['description']}")
+                        if s.get('tags'):
+                            tags_str = " | ".join([f"🏷️ {tag}" for tag in s['tags']])
+                            st.caption(tags_str)
+                    with col2:
+                        st.metric("📊", s.get('views', 0))
+                    
+                    st.code(s.get('script_text', ''), language="lua")
+                    st.download_button(
+                        t('download_btn'),
+                        data=s.get('script_text', ''),
+                        file_name=f"{s.get('title', 'script')}.lua",
+                        mime="text/plain",
+                        use_container_width=True,
+                        key=f"recent_download_{s['id']}"
+                    )
 if not st.session_state.user:
     login_page()
 else:

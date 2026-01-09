@@ -4,14 +4,25 @@
 
 ## ✨ 功能
 
+### 核心功能
+- 🔐 **多語言支持** - 完整的繁體中文和英文翻譯
 - 🔐 **用戶認證** - 註冊、登入、登出
 - 📝 **編輯腳本** - 線上 Lua 代碼編輯器，語法高亮
 - ☁️ **雲端儲存** - 將腳本儲存到 Supabase 資料庫
 - 📚 **腳本庫** - 查看、編輯、刪除個人腳本
 - 🔍 **搜尋功能** - 按標題或標籤搜尋所有腳本
+
+### 新增功能 ⭐
+- 🔥 **熱門腳本** - 查看點讚數最多的腳本
+- ⭐ **收藏夾** - 標記喜歡的腳本為收藏
+- 🕐 **最近瀏覽** - 快速查看最近的腳本
+- 👍 **點讚系統** - 給喜歡的腳本點讚
+- 🔗 **分享功能** - 分享腳本的訊息
 - 📥 **下載** - 下載腳本為 .lua 文件
 - 📋 **複製** - 輕鬆複製腳本代碼
+- 📊 **統計信息** - 查看腳本的瀏覽數、點讚數、評分
 - 📱 **行動優化** - 為手機和平板最佳化的界面
+- 💬 **Discord 按鈕** - 快速加入 Discord 社群
 
 ## 🚀 快速開始
 
@@ -42,6 +53,11 @@ CREATE TABLE user_scripts (
     description TEXT,
     script_text TEXT NOT NULL,
     tags TEXT[] DEFAULT '{}',
+    author TEXT,
+    likes INT DEFAULT 0,
+    views INT DEFAULT 0,
+    rating DECIMAL(3,2) DEFAULT 0,
+    is_favorite BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
