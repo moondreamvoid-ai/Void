@@ -12,15 +12,29 @@ st.set_page_config(
 )
 
 # 手機優化 CSS
-st.markdown("""
-<style>
-    .stApp { font-size: 16px !important; }
-    .stButton > button { font-size: 18px; padding: 14px 24px; width: 100%; margin: 8px 0; }
-    .stTextInput > div > div > input, .stTextArea > div > div > textarea { font-size: 16px; }
-    section[data-testid="stSidebar"] { width: 100% !important; }
-    .block-container { padding: 1rem !important; }
-</style>
-""", unsafe_allow_html=True)
+def load_custom_css():
+    """加載自定義 CSS 樣式"""
+    st.markdown("""
+    <style>
+        .stApp { font-size: 16px !important; }
+        .stButton > button { 
+            font-size: 18px; 
+            padding: 14px 24px; 
+            width: 100%; 
+            margin: 8px 0;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .stTextInput > div > div > input, .stTextArea > div > div > textarea { font-size: 16px; border-radius: 6px; }
+        section[data-testid="stSidebar"] { width: 100% !important; }
+        .block-container { padding: 1rem !important; }
+        .stMetric { background-color: rgba(0,0,0,0.05); padding: 12px; border-radius: 6px; }
+        .stExpander { border-radius: 6px; border: 1px solid rgba(0,0,0,0.1); }
+    </style>
+    """, unsafe_allow_html=True)
+
+load_custom_css()
 
 # 多語言翻譯
 TRANSLATIONS = {
@@ -212,8 +226,37 @@ def init_session_state():
         st.session_state.language = "zh-tw"
 
 def t(key):
-    """翻譯函數"""
+    """翻譯函數 - 根據當前語言返回對應文本"""
     return TRANSLATIONS[st.session_state.language].get(key, key)
+
+def get_discord_button_html():
+    """生成 Discord 按鈕 HTML"""
+    return """
+    <div style="text-align: center;">
+        <a href="https://discord.gg/qbBdERgaQ" target="_blank" style="text-decoration: none;">
+            <button style="
+                background-color: #5865F2;
+                color: white;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                cursor: pointer;
+                width: 100%;
+                font-weight: bold;
+                transition: background-color 0.3s;
+            " onmouseover="this.style.backgroundColor='#4752C4'" onmouseout="this.style.backgroundColor='#5865F2'">
+                💬 Discord
+            </button>
+        </a>
+    </div>
+    """
+
+def validate_email(email):
+    """驗證 Email 格式"""
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
 init_session_state()
 supabase = st.session_state.supabase
@@ -230,33 +273,15 @@ def login_page():
             t('language'),
             ["zh-tw", "en"],
             format_func=lambda x: "繁體中文" if x == "zh-tw" else "English",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            index=0 if st.session_state.language == "zh-tw" else 1
         )
         if lang != st.session_state.language:
             st.session_state.language = lang
             st.rerun()
         
         st.divider()
-        st.markdown("""
-        <div style="text-align: center;">
-            <a href="https://discord.gg/qbBdERgaQ" target="_blank" style="text-decoration: none;">
-                <button style="
-                    background-color: #5865F2;
-                    color: white;
-                    padding: 12px 24px;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 16px;
-                    cursor: pointer;
-                    width: 100%;
-                    font-weight: bold;
-                    transition: background-color 0.3s;
-                " onmouseover="this.style.backgroundColor='#4752C4'" onmouseout="this.style.backgroundColor='#5865F2'">
-                    💬 Discord
-                </button>
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(get_discord_button_html(), unsafe_allow_html=True)
     
     tab1, tab2 = st.tabs([t('login'), t('signup')])
     
@@ -268,6 +293,8 @@ def login_page():
         if st.button(t('sign_in_btn'), use_container_width=True):
             if not email or not password:
                 st.error(t('error_email_password'))
+            elif not validate_email(email):
+                st.error("❌ Email 格式無效")
             else:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
@@ -278,7 +305,11 @@ def login_page():
                     else:
                         st.error(t('error_login_failed'))
                 except Exception as e:
-                    st.error(f"{t('error_login')}{str(e)}")
+                    error_msg = str(e)
+                    if "Invalid login credentials" in error_msg:
+                        st.error("❌ 帳號或密碼錯誤")
+                    else:
+                        st.error(f"{t('error_login')}{error_msg}")
     
     with tab2:
         st.subheader(t('signup_subtitle'))
@@ -289,6 +320,8 @@ def login_page():
         if st.button(t('sign_up_btn'), use_container_width=True):
             if not email or not password:
                 st.error(t('error_email_password'))
+            elif not validate_email(email):
+                st.error("❌ Email 格式無效")
             elif password != confirm_password:
                 st.error(t('error_password_mismatch'))
             elif len(password) < 6:
@@ -297,8 +330,16 @@ def login_page():
                 try:
                     res = supabase.auth.sign_up({"email": email, "password": password})
                     st.success(t('success_signup'))
+                    # 清空表單
+                    st.session_state.signup_email = ""
+                    st.session_state.signup_password = ""
+                    st.session_state.signup_confirm = ""
                 except Exception as e:
-                    st.error(f"{t('error_signup')}{str(e)}")
+                    error_msg = str(e)
+                    if "already registered" in error_msg.lower():
+                        st.error("❌ 此 Email 已被註冊")
+                    else:
+                        st.error(f"{t('error_signup')}{error_msg}")
 
 def main_page():
     """主頁面"""
@@ -332,7 +373,8 @@ def main_page():
             t('language'),
             ["zh-tw", "en"],
             format_func=lambda x: "繁體中文" if x == "zh-tw" else "English",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            index=0 if st.session_state.language == "zh-tw" else 1
         )
         if lang != st.session_state.language:
             st.session_state.language = lang
@@ -341,26 +383,7 @@ def main_page():
         st.divider()
         
         # Discord 按鈕
-        st.markdown("""
-        <div style="text-align: center;">
-            <a href="https://discord.gg/qbBdERgaQ" target="_blank" style="text-decoration: none;">
-                <button style="
-                    background-color: #5865F2;
-                    color: white;
-                    padding: 12px 24px;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 16px;
-                    cursor: pointer;
-                    width: 100%;
-                    font-weight: bold;
-                    transition: background-color 0.3s;
-                " onmouseover="this.style.backgroundColor='#4752C4'" onmouseout="this.style.backgroundColor='#5865F2'">
-                    💬 Discord
-                </button>
-            </a>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(get_discord_button_html(), unsafe_allow_html=True)
     
     # 新增腳本頁面
     if page == t('add_script'):
